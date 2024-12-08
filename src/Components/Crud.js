@@ -1,27 +1,46 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useContext, createContext, useRef } from 'react';
+
+// Create a context for CRUD data management
+const CrudContext = createContext();
+
+const CrudProvider = ({ children }) => {
+  const [submittedData, setSubmittedData] = useState([]);
+
+  // Persist data in localStorage and retrieve it on mount
+  useEffect(() => {
+    const savedData = JSON.parse(localStorage.getItem('submittedData')) || [];
+    setSubmittedData(savedData);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('submittedData', JSON.stringify(submittedData));
+  }, [submittedData]);
+
+  return (
+    <CrudContext.Provider value={{ submittedData, setSubmittedData }}>
+      {children}
+    </CrudContext.Provider>
+  );
+};
 
 const Crud = () => {
-  // State for managing form data, submitted data, and edit index
+  const { submittedData, setSubmittedData } = useContext(CrudContext);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     phone: '',
     age: '',
   });
-
-  const [submittedData, setSubmittedData] = useState([]);
-  const [editIndex, setEditIndex] = useState(null); // For editing an entry
-  const [error, setError] = useState(null); // For displaying errors
-  
-  // UseRef to focus on the first input field when the form loads
+  const [editIndex, setEditIndex] = useState(null);
   const firstNameInput = useRef(null);
 
-  // Focus on the first name input when the form is mounted
+  // Focus on the first input field when the component mounts
   useEffect(() => {
-    firstNameInput.current.focus();
-  }, []); // Empty array means this runs only once when the component mounts
+    if (firstNameInput.current) {
+      firstNameInput.current.focus();
+    }
+  }, []);
 
-  // Handle input changes and update form data
   const handleInputChange = (e) => {
     const { id, value } = e.target;
     setFormData({
@@ -30,40 +49,28 @@ const Crud = () => {
     });
   };
 
-  // Memoizing the filtered data (just an example to show useMemo)
-  const filteredData = useMemo(() => {
-    return submittedData.filter((entry) => entry.age > 18); // Example filter logic
-  }, [submittedData]); // Recompute the filtered data only when submittedData changes
-
-  // Validate phone number and submit form data
   const handleSubmit = (e) => {
-    e.preventDefault(); // Prevent form from reloading the page
-    setError(null); // Reset error message
+    e.preventDefault();
 
-    // Basic validation: Check if all fields are filled
     if (!formData.firstName || !formData.lastName || !formData.phone || !formData.age) {
-      setError('All fields are required!');
+      alert('All fields are required!');
       return;
     }
 
-    // Phone number validation (it should be numeric)
     if (isNaN(formData.phone)) {
-      setError('Phone number should be a valid number!');
+      alert('Phone number should be a valid number!');
       return;
     }
 
-    // If editing an existing entry, update the entry
     if (editIndex !== null) {
       const updatedData = [...submittedData];
       updatedData[editIndex] = formData;
       setSubmittedData(updatedData);
-      setEditIndex(null); // Reset editIndex after update
+      setEditIndex(null);
     } else {
-      // Add new data to the submittedData array
       setSubmittedData([...submittedData, formData]);
     }
 
-    // Clear the form after submission
     setFormData({
       firstName: '',
       lastName: '',
@@ -72,16 +79,14 @@ const Crud = () => {
     });
   };
 
-  // Delete a specific entry from the submittedData array
-  const handleDelete = useCallback((index) => {
+  const handleDelete = (index) => {
     const updatedData = submittedData.filter((_, i) => i !== index);
     setSubmittedData(updatedData);
-  }, [submittedData]); // useCallback prevents unnecessary re-renders
+  };
 
-  // Set the form data for editing an existing entry
   const handleEdit = (index) => {
     setFormData(submittedData[index]);
-    setEditIndex(index); // Set the index for editing
+    setEditIndex(index);
   };
 
   return (
@@ -91,7 +96,7 @@ const Crud = () => {
         <div style={styles.inputGroup}>
           <label htmlFor="firstName" style={styles.label}>First Name</label>
           <input
-            ref={firstNameInput} // Focus the input on form mount
+            ref={firstNameInput}
             type="text"
             id="firstName"
             style={styles.input}
@@ -138,13 +143,9 @@ const Crud = () => {
         </button>
       </form>
 
-      {/* Display error message */}
-      {error && <div style={styles.error}>{error}</div>}
-
-      {/* Display submitted data with edit and delete buttons */}
       <h2>Submitted Data</h2>
       <ul>
-        {filteredData.map((entry, index) => (
+        {submittedData.map((entry, index) => (
           <li key={index}>
             Full Name - {entry.firstName} {entry.lastName}, Phone: {entry.phone}, Age: {entry.age}
             <button style={styles.editButton} onClick={() => handleEdit(index)}>Edit</button>
@@ -198,10 +199,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'background-color 0.3s',
   },
-  error: {
-    color: 'red',
-    fontWeight: 'bold',
-  },
   editButton: {
     backgroundColor: '#28a745',
     color: 'white',
@@ -220,4 +217,11 @@ const styles = {
   },
 };
 
-export default Crud;
+// Wrap the Crud component with the CrudProvider for global state
+const App = () => (
+  <CrudProvider>
+    <Crud />
+  </CrudProvider>
+);
+
+export default App;
